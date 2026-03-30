@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import Fuse from 'fuse.js';
 import {
 	Users,
 	Plus,
@@ -157,16 +158,28 @@ export function Admin() {
 		}
 	};
 
-	const filteredFamilies = families.filter((f) => {
-		const matchesSearch =
-			f.family_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			f.notes?.toLowerCase().includes(searchQuery.toLowerCase());
-		const matchesAddedBy = filterBy === 'all' || f.added_by === filterBy;
-		const matchesRel =
-			filterRelationship === 'all' ||
-			f.relationship_type === filterRelationship;
-		return matchesSearch && matchesAddedBy && matchesRel;
-	});
+	const fuse = useMemo(
+		() =>
+			new Fuse(families, {
+				keys: ['family_name', 'notes', 'contact_phone'],
+				threshold: 0.35,
+				ignoreLocation: true,
+			}),
+		[families]
+	);
+
+	const filteredFamilies = useMemo(() => {
+		const searched = searchQuery.trim()
+			? fuse.search(searchQuery).map((r) => r.item)
+			: families;
+
+		return searched.filter((f) => {
+			const matchesAddedBy = filterBy === 'all' || f.added_by === filterBy;
+			const matchesRel =
+				filterRelationship === 'all' || f.relationship_type === filterRelationship;
+			return matchesAddedBy && matchesRel;
+		});
+	}, [searchQuery, families, fuse, filterBy, filterRelationship]);
 
 	const stats = {
 		total: families.length,
