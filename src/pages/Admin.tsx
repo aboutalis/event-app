@@ -8,6 +8,8 @@ import {
 	Send,
 	Search,
 	ChevronDown,
+	ChevronUp,
+	ChevronsUpDown,
 	X,
 	Check,
 } from 'lucide-react';
@@ -20,12 +22,12 @@ const ADDED_BY_OPTIONS = [
 	{ value: 'ntina', label: 'Ντίνα' },
 	{ value: 'giannis', label: 'Γιάννης' },
 	{ value: 'anna', label: 'Άννα' },
-	{ value: 'maria_mp', label: 'Μαρία Μπ' },
+	{ value: 'maria_mp', label: 'Μαρία Μπ.' },
 	{ value: 'emma', label: 'Έμμα' },
 	{ value: 'pantelis', label: 'Παντελής' },
-	{ value: 'maria_mand', label: 'Μαρία Μανδ' },
-	{ value: 'spyros_ts', label: 'Σπύρος Τσ' },
-	{ value: 'sofia_mar', label: 'Σοφία Μαρ' },
+	{ value: 'maria_mand', label: 'Μαρία Μανδρ.' },
+	{ value: 'spyros_ts', label: 'Σπύρος Τσ.' },
+	{ value: 'sofia_mar', label: 'Σοφία Μαρ.' },
 ];
 
 const RELATIONSHIP_OPTIONS = [
@@ -58,6 +60,8 @@ export function Admin() {
 	const [filterBy, setFilterBy] = useState('all');
 	const [filterRelationship, setFilterRelationship] = useState('all');
 	const [formData, setFormData] = useState(defaultForm);
+	const [sortCol, setSortCol] = useState<'family_name' | 'expected_guests' | 'relationship_type' | 'added_by' | null>(null);
+	const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
 	useEffect(() => {
 		fetchFamilies();
@@ -173,13 +177,42 @@ export function Admin() {
 			? fuse.search(searchQuery).map((r) => r.item)
 			: families;
 
-		return searched.filter((f) => {
+		const filtered = searched.filter((f) => {
 			const matchesAddedBy = filterBy === 'all' || f.added_by === filterBy;
 			const matchesRel =
-				filterRelationship === 'all' || f.relationship_type === filterRelationship;
+				filterRelationship === 'all' ||
+				f.relationship_type === filterRelationship;
 			return matchesAddedBy && matchesRel;
 		});
-	}, [searchQuery, families, fuse, filterBy, filterRelationship]);
+
+		if (!sortCol) return filtered;
+
+		return [...filtered].sort((a, b) => {
+			const aVal = a[sortCol];
+			const bVal = b[sortCol];
+			const cmp =
+				typeof aVal === 'number' && typeof bVal === 'number'
+					? aVal - bVal
+					: String(aVal).localeCompare(String(bVal), 'el');
+			return sortDir === 'asc' ? cmp : -cmp;
+		});
+	}, [searchQuery, families, fuse, filterBy, filterRelationship, sortCol, sortDir]);
+
+	const handleSort = (col: typeof sortCol) => {
+		if (sortCol === col) {
+			setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+		} else {
+			setSortCol(col);
+			setSortDir('asc');
+		}
+	};
+
+	const SortIcon = ({ col }: { col: typeof sortCol }) => {
+		if (sortCol !== col) return <ChevronsUpDown className="w-3 h-3 opacity-40" />;
+		return sortDir === 'asc'
+			? <ChevronUp className="w-3 h-3" />
+			: <ChevronDown className="w-3 h-3" />;
+	};
 
 	const stats = {
 		total: families.length,
@@ -465,11 +498,24 @@ export function Admin() {
 					<div className="bg-white rounded-2xl border border-secondary/60 overflow-hidden">
 						{/* Table header — desktop */}
 						<div className="hidden md:grid grid-cols-[1fr_60px_140px_100px_116px] px-5 py-3 border-b border-secondary/60 text-xs font-medium text-text-muted uppercase tracking-wide">
-							<span>Όνομα</span>
-							<span className="text-center">Άτομα</span>
-							<span>Σχέση</span>
-							<span>Από</span>
-							<span>Ενέργειες</span>
+							{(
+								[
+									{ col: 'family_name', label: 'Όνομα', align: 'left' },
+									{ col: 'expected_guests', label: 'Άτομα', align: 'center' },
+									{ col: 'relationship_type', label: 'Σχέση', align: 'left' },
+									{ col: 'added_by', label: 'Από', align: 'left' },
+								] as const
+							).map(({ col, label, align }) => (
+								<button
+									key={col}
+									onClick={() => handleSort(col)}
+									className={`flex items-center gap-1 hover:text-text-primary transition-colors ${align === 'center' ? 'justify-center' : ''} ${sortCol === col ? 'text-accent' : ''}`}
+								>
+									{label}
+									<SortIcon col={col} />
+								</button>
+							))}
+							<span className="text-center">Ενέργειες</span>
 						</div>
 
 						<div className="divide-y divide-secondary/40">

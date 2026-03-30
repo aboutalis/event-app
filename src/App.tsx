@@ -6,6 +6,7 @@ import { Moments } from './pages/Moments';
 import { Wishes } from './pages/Wishes';
 import { RSVP } from './pages/RSVP';
 import { Admin } from './pages/Admin';
+import { Costs } from './pages/Costs';
 import { TablesManagement } from './pages/TablesManagement';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
 					<Route path="/wishes" element={<Wishes />} />
 					<Route path="/rsvp" element={<RSVP />} />
 					<Route path="/admin" element={<Admin />} />
+					<Route path="/costs" element={<Costs />} />
 					<Route path="/tables-management" element={<TablesManagement />} />
 				</Routes>
 			</Layout>

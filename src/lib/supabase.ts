@@ -112,6 +112,18 @@ export interface Wish {
 	created_at: string;
 }
 
+export interface EventCost {
+	id: string;
+	name: string;
+	total_amount: number;
+	upfront_amount: number;
+	paid_amount: number;
+	is_paid: boolean;
+	notes: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
 export interface Like {
 	id: string;
 	wish_id: string;
