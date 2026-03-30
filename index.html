@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="el">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+		<!-- Early connection to Unsplash CDN for service page hero images -->
+		<link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+		<link rel="dns-prefetch" href="https://images.unsplash.com" />
+
+		<!-- Favicons - Dark mode (white logo) -->
+		<link
+			rel="icon"
+			type="image/x-icon"
+			href="/favicon-light.ico"
+			media="(prefers-color-scheme: dark)"
+		/>
+		<link
+			rel="icon"
+			type="image/png"
+			sizes="16x16"
+			href="/favicon-16x16-light.png"
+			media="(prefers-color-scheme: dark)"
+		/>
+		<link
+			rel="icon"
+			type="image/png"
+			sizes="32x32"
+			href="/favicon-32x32-light.png"
+			media="(prefers-color-scheme: dark)"
+		/>
+		<link
+			rel="apple-touch-icon"
+			sizes="180x180"
+			href="/apple-touch-icon-light.png"
+			media="(prefers-color-scheme: dark)"
+		/>
+
+		<!-- Favicons - Light mode (dark logo) -->
+		<link
+			rel="icon"
+			type="image/x-icon"
+			href="/favicon-dark.ico"
+			media="(prefers-color-scheme: light)"
+		/>
+		<link
+			rel="icon"
+			type="image/png"
+			sizes="16x16"
+			href="/favicon-16x16-dark.png"
+			media="(prefers-color-scheme: light)"
+		/>
+		<link
+			rel="icon"
+			type="image/png"
+			sizes="32x32"
+			href="/favicon-32x32-dark.png"
+			media="(prefers-color-scheme: light)"
+		/>
+		<link
+			rel="apple-touch-icon"
+			sizes="180x180"
+			href="/apple-touch-icon-dark.png"
+			media="(prefers-color-scheme: light)"
+		/>
+
+		<!-- Fallback for browsers that don't support media queries -->
+		<link rel="icon" type="image/x-icon" href="/favicon-dark.ico" />
+
+		<!-- Android Chrome -->
+		<link rel="manifest" href="/site.webmanifest" />
+
+		<meta name="author" content="Δρ. Αναστάσιος Τραϊκάπης" />
+		<meta property="og:type" content="website" />
+		<meta
+			property="og:image"
+			content="https://traikapis-gynaikologos.gr/og-image.png"
+		/>
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta
+			property="og:image:alt"
+			content="Δρ. Αναστάσιος Τραϊκάπης - Μαιευτήρας Γυναικολόγος"
+		/>
+
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta
+			name="twitter:image"
+			content="https://traikapis-gynaikologos.gr/og-image.png"
+		/>
+	</head>
+
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/src/main.tsx"></script>
+	</body>
+</html>
