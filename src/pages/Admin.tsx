@@ -324,15 +324,17 @@ export function Admin() {
 										Αριθμός Ατόμων *
 									</label>
 									<input
-										type="number"
-										min="1"
+										type="text"
+										inputMode="numeric"
+										pattern="[0-9]*"
 										value={formData.expected_guests}
-										onChange={(e) =>
+										onChange={(e) => {
+											const raw = e.target.value.replace(/\D/g, '');
 											setFormData({
 												...formData,
-												expected_guests: parseInt(e.target.value) || 1,
-											})
-										}
+												expected_guests: raw === '' ? 1 : parseInt(raw, 10),
+											});
+										}}
 										className={fieldClass}
 										required
 									/>
