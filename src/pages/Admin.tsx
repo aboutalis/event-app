@@ -60,7 +60,7 @@ export function Admin() {
 	const [filterBy, setFilterBy] = useState('all');
 	const [filterRelationship, setFilterRelationship] = useState('all');
 	const [formData, setFormData] = useState(defaultForm);
-	const [sortCol, setSortCol] = useState<'family_name' | 'expected_guests' | 'relationship_type' | 'added_by' | null>(null);
+	const [sortCol, setSortCol] = useState<'family_name' | 'expected_guests' | 'relationship_type' | 'added_by' | null>('family_name');
 	const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
 	useEffect(() => {
@@ -323,21 +323,26 @@ export function Admin() {
 									<label className="block text-xs font-medium text-text-muted mb-1.5">
 										Αριθμός Ατόμων *
 									</label>
-									<input
-										type="text"
-										inputMode="numeric"
-										pattern="[0-9]*"
-										value={formData.expected_guests}
-										onChange={(e) => {
-											const raw = e.target.value.replace(/\D/g, '');
-											setFormData({
-												...formData,
-												expected_guests: raw === '' ? 1 : parseInt(raw, 10),
-											});
-										}}
-										className={fieldClass}
-										required
-									/>
+									<div className="relative">
+										<select
+											value={formData.expected_guests}
+											onChange={(e) =>
+												setFormData({
+													...formData,
+													expected_guests: parseInt(e.target.value, 10),
+												})
+											}
+											className={`${fieldClass} appearance-none pr-8`}
+											required
+										>
+											{Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+												<option key={n} value={n}>
+													{n}
+												</option>
+											))}
+										</select>
+										<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+									</div>
 								</div>
 
 								<div>
