@@ -60,12 +60,21 @@ export function Admin() {
 	const [filterBy, setFilterBy] = useState('all');
 	const [filterRelationship, setFilterRelationship] = useState('all');
 	const [formData, setFormData] = useState(defaultForm);
-	const [sortCol, setSortCol] = useState<'family_name' | 'expected_guests' | 'relationship_type' | 'added_by' | null>('family_name');
+	const [sortCol, setSortCol] = useState<
+		'family_name' | 'expected_guests' | 'relationship_type' | 'added_by' | null
+	>('family_name');
 	const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
 	useEffect(() => {
 		fetchFamilies();
 	}, []);
+
+	useEffect(() => {
+		document.body.style.overflow = showForm ? 'hidden' : '';
+		return () => {
+			document.body.style.overflow = '';
+		};
+	}, [showForm]);
 
 	const fetchFamilies = async () => {
 		setLoading(true);
@@ -128,7 +137,6 @@ export function Admin() {
 		});
 		setEditingId(family.id);
 		setShowForm(true);
-		window.scrollTo({ top: 0, behavior: 'smooth' });
 	};
 
 	const handleDelete = async (id: string) => {
@@ -196,7 +204,15 @@ export function Admin() {
 					: String(aVal).localeCompare(String(bVal), 'el');
 			return sortDir === 'asc' ? cmp : -cmp;
 		});
-	}, [searchQuery, families, fuse, filterBy, filterRelationship, sortCol, sortDir]);
+	}, [
+		searchQuery,
+		families,
+		fuse,
+		filterBy,
+		filterRelationship,
+		sortCol,
+		sortDir,
+	]);
 
 	const handleSort = (col: typeof sortCol) => {
 		if (sortCol === col) {
@@ -208,10 +224,13 @@ export function Admin() {
 	};
 
 	const SortIcon = ({ col }: { col: typeof sortCol }) => {
-		if (sortCol !== col) return <ChevronsUpDown className="w-3 h-3 opacity-40" />;
-		return sortDir === 'asc'
-			? <ChevronUp className="w-3 h-3" />
-			: <ChevronDown className="w-3 h-3" />;
+		if (sortCol !== col)
+			return <ChevronsUpDown className="w-3 h-3 opacity-40" />;
+		return sortDir === 'asc' ? (
+			<ChevronUp className="w-3 h-3" />
+		) : (
+			<ChevronDown className="w-3 h-3" />
+		);
 	};
 
 	const stats = {
@@ -227,7 +246,7 @@ export function Admin() {
 		ADDED_BY_OPTIONS.find((o) => o.value === v)?.label ?? v;
 
 	const fieldClass =
-		'w-full px-3 py-2.5 rounded-xl border border-secondary bg-white text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all';
+		'w-full px-3 py-2.5 rounded-xl border border-secondary bg-white text-base md:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all';
 
 	return (
 		<div className="min-h-screen bg-background">
@@ -287,161 +306,178 @@ export function Admin() {
 					))}
 				</div>
 
-				{/* Form */}
+				{/* Form Modal */}
 				{showForm && (
-					<div className="bg-white rounded-2xl border border-secondary/60 overflow-hidden">
-						<div className="flex items-center justify-between px-5 py-4 border-b border-secondary/60">
-							<h2 className="text-base font-semibold text-text-primary">
-								{editingId ? 'Επεξεργασία' : 'Νέα Εγγραφή'}
-							</h2>
-							<button
-								onClick={resetForm}
-								className="text-text-muted hover:text-text-primary transition-colors"
-							>
-								<X className="w-5 h-5" />
-							</button>
-						</div>
-						<form onSubmit={handleSubmit} className="p-5 space-y-4">
-							<div className="grid md:grid-cols-2 gap-4">
-								<div className="md:col-span-2">
-									<label className="block text-xs font-medium text-text-muted mb-1.5">
-										Όνομα Οικογένειας / Ομάδας *
-									</label>
-									<input
-										type="text"
-										placeholder="π.χ. Οικογένεια Παπαδόπουλου"
-										value={formData.family_name}
-										onChange={(e) =>
-											setFormData({ ...formData, family_name: e.target.value })
-										}
-										className={fieldClass}
-										required
-									/>
-								</div>
-
-								<div>
-									<label className="block text-xs font-medium text-text-muted mb-1.5">
-										Αριθμός Ατόμων *
-									</label>
-									<div className="relative">
-										<select
-											value={formData.expected_guests}
-											onChange={(e) =>
-												setFormData({
-													...formData,
-													expected_guests: parseInt(e.target.value, 10),
-												})
-											}
-											className={`${fieldClass} appearance-none pr-8`}
-											required
-										>
-											{Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-												<option key={n} value={n}>
-													{n}
-												</option>
-											))}
-										</select>
-										<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-									</div>
-								</div>
-
-								<div>
-									<label className="block text-xs font-medium text-text-muted mb-1.5">
-										Προστέθηκε Από *
-									</label>
-									<div className="relative">
-										<select
-											value={formData.added_by}
-											onChange={(e) =>
-												setFormData({ ...formData, added_by: e.target.value })
-											}
-											className={`${fieldClass} appearance-none pr-8`}
-										>
-											{ADDED_BY_OPTIONS.map((o) => (
-												<option key={o.value} value={o.value}>
-													{o.label}
-												</option>
-											))}
-										</select>
-										<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-									</div>
-								</div>
-
-								<div>
-									<label className="block text-xs font-medium text-text-muted mb-1.5">
-										Τύπος Σχέσης *
-									</label>
-									<div className="relative">
-										<select
-											value={formData.relationship_type}
-											onChange={(e) =>
-												setFormData({
-													...formData,
-													relationship_type: e.target.value,
-												})
-											}
-											className={`${fieldClass} appearance-none pr-8`}
-										>
-											{RELATIONSHIP_OPTIONS.map((o) => (
-												<option key={o.value} value={o.value}>
-													{o.label}
-												</option>
-											))}
-										</select>
-										<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-									</div>
-								</div>
-
-								<div>
-									<label className="block text-xs font-medium text-text-muted mb-1.5">
-										Τηλέφωνο
-									</label>
-									<input
-										type="tel"
-										placeholder="Προαιρετικό"
-										value={formData.contact_phone}
-										onChange={(e) =>
-											setFormData({
-												...formData,
-												contact_phone: e.target.value,
-											})
-										}
-										className={fieldClass}
-									/>
-								</div>
-
-								<div className="md:col-span-2">
-									<label className="block text-xs font-medium text-text-muted mb-1.5">
-										Σημειώσεις
-									</label>
-									<textarea
-										placeholder="Πρόσθετες πληροφορίες..."
-										value={formData.notes}
-										onChange={(e) =>
-											setFormData({ ...formData, notes: e.target.value })
-										}
-										rows={2}
-										className={fieldClass}
-									/>
-								</div>
-							</div>
-
-							<div className="flex gap-2 pt-1">
+					<div
+						className="fixed inset-0 z-50 flex items-center justify-center p-4 !m-0"
+						onClick={resetForm}
+					>
+						<div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+						<div
+							className="relative w-full max-w-lg bg-white rounded-2xl shadow-elevated overflow-hidden max-h-[90vh] flex flex-col"
+							onClick={(e) => e.stopPropagation()}
+						>
+							<div className="flex items-center justify-between px-5 py-4 border-b border-secondary/60 shrink-0">
+								<h2 className="text-base font-semibold text-text-primary">
+									{editingId ? 'Επεξεργασία' : 'Νέα Εγγραφή'}
+								</h2>
 								<button
-									type="button"
 									onClick={resetForm}
-									className="px-4 py-2.5 text-sm font-medium text-text-muted border border-secondary rounded-xl hover:bg-secondary/30 transition-colors"
+									className="text-text-muted hover:text-text-primary transition-colors"
 								>
-									Ακύρωση
-								</button>
-								<button
-									type="submit"
-									className="flex-1 px-4 py-2.5 text-sm font-medium bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors"
-								>
-									{editingId ? 'Αποθήκευση' : 'Προσθήκη'}
+									<X className="w-5 h-5" />
 								</button>
 							</div>
-						</form>
+							<form
+								onSubmit={handleSubmit}
+								className="p-5 space-y-4 overflow-y-auto"
+							>
+								<div className="grid md:grid-cols-2 gap-4">
+									<div className="md:col-span-2">
+										<label className="block text-xs font-medium text-text-muted mb-1.5">
+											Όνομα Οικογένειας / Ομάδας *
+										</label>
+										<input
+											type="text"
+											placeholder="π.χ. Οικογένεια Παπαδόπουλου"
+											value={formData.family_name}
+											onChange={(e) =>
+												setFormData({
+													...formData,
+													family_name: e.target.value,
+												})
+											}
+											className={fieldClass}
+											required
+										/>
+									</div>
+
+									<div>
+										<label className="block text-xs font-medium text-text-muted mb-1.5">
+											Αριθμός Ατόμων *
+										</label>
+										<div className="relative">
+											<select
+												value={formData.expected_guests}
+												onChange={(e) =>
+													setFormData({
+														...formData,
+														expected_guests: parseInt(e.target.value, 10),
+													})
+												}
+												className={`${fieldClass} appearance-none pr-8`}
+												required
+											>
+												{Array.from({ length: 10 }, (_, i) => i + 1).map(
+													(n) => (
+														<option key={n} value={n}>
+															{n}
+														</option>
+													)
+												)}
+											</select>
+											<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+										</div>
+									</div>
+
+									<div>
+										<label className="block text-xs font-medium text-text-muted mb-1.5">
+											Προστέθηκε Από *
+										</label>
+										<div className="relative">
+											<select
+												value={formData.added_by}
+												onChange={(e) =>
+													setFormData({ ...formData, added_by: e.target.value })
+												}
+												className={`${fieldClass} appearance-none pr-8`}
+											>
+												{ADDED_BY_OPTIONS.map((o) => (
+													<option key={o.value} value={o.value}>
+														{o.label}
+													</option>
+												))}
+											</select>
+											<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+										</div>
+									</div>
+
+									<div>
+										<label className="block text-xs font-medium text-text-muted mb-1.5">
+											Τύπος Σχέσης *
+										</label>
+										<div className="relative">
+											<select
+												value={formData.relationship_type}
+												onChange={(e) =>
+													setFormData({
+														...formData,
+														relationship_type: e.target.value,
+													})
+												}
+												className={`${fieldClass} appearance-none pr-8`}
+											>
+												{RELATIONSHIP_OPTIONS.map((o) => (
+													<option key={o.value} value={o.value}>
+														{o.label}
+													</option>
+												))}
+											</select>
+											<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+										</div>
+									</div>
+
+									<div>
+										<label className="block text-xs font-medium text-text-muted mb-1.5">
+											Τηλέφωνο
+										</label>
+										<input
+											type="tel"
+											placeholder="Προαιρετικό"
+											value={formData.contact_phone}
+											onChange={(e) =>
+												setFormData({
+													...formData,
+													contact_phone: e.target.value,
+												})
+											}
+											className={fieldClass}
+										/>
+									</div>
+
+									<div className="md:col-span-2">
+										<label className="block text-xs font-medium text-text-muted mb-1.5">
+											Σημειώσεις
+										</label>
+										<textarea
+											placeholder="Πρόσθετες πληροφορίες..."
+											value={formData.notes}
+											onChange={(e) =>
+												setFormData({ ...formData, notes: e.target.value })
+											}
+											rows={2}
+											className={fieldClass}
+										/>
+									</div>
+								</div>
+
+								<div className="flex gap-2 pt-1">
+									<button
+										type="button"
+										onClick={resetForm}
+										className="px-4 py-2.5 text-sm font-medium text-text-muted border border-secondary rounded-xl hover:bg-secondary/30 transition-colors"
+									>
+										Ακύρωση
+									</button>
+									<button
+										type="submit"
+										className="flex-1 px-4 py-2.5 text-sm font-medium bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors"
+									>
+										{editingId ? 'Αποθήκευση' : 'Προσθήκη'}
+									</button>
+								</div>
+							</form>
+						</div>
 					</div>
 				)}
 
