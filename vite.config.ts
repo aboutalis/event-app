@@ -13,37 +13,75 @@ export default defineConfig({
 		react(),
 		VitePWA({
 			registerType: 'autoUpdate',
-			includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+			includeAssets: [
+				'favicon.svg',
+				'favicon-16x16.png',
+				'favicon-32x32.png',
+				'apple-touch-icon.png',
+			],
 			manifest: {
-				name: 'Sofia & Alexander Wedding',
-				short_name: 'Wedding',
-				description: 'Wedding & Baptism Celebration App',
-				theme_color: '#ffffff',
-				background_color: '#ffffff',
+				id: '/',
+				name: 'Γάμος & Βάπτιση',
+				short_name: 'Γάμος',
+				description: 'Διαχείριση προσκλήσεων και εξόδων',
+				lang: 'el',
+				dir: 'ltr',
+				theme_color: '#FFFFFF',
+				background_color: '#F8F6F2',
 				display: 'standalone',
+				orientation: 'portrait',
 				scope: '/',
 				start_url: '/',
+				categories: ['productivity', 'lifestyle'],
 				icons: [
+					{
+						src: 'pwa-64x64.png',
+						sizes: '64x64',
+						type: 'image/png',
+					},
 					{
 						src: 'pwa-192x192.png',
 						sizes: '192x192',
-						type: 'image/png'
-					},
-					{
-						src: 'pwa-512x512.png',
-						sizes: '512x512',
-						type: 'image/png'
+						type: 'image/png',
+						purpose: 'any',
 					},
 					{
 						src: 'pwa-512x512.png',
 						sizes: '512x512',
 						type: 'image/png',
-						purpose: 'any maskable'
-					}
-				]
+						purpose: 'any',
+					},
+					{
+						src: 'maskable-icon-512x512.png',
+						sizes: '512x512',
+						type: 'image/png',
+						purpose: 'maskable',
+					},
+				],
+				shortcuts: [
+					{
+						name: 'Προσκλήσεις',
+						url: '/admin',
+						icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }],
+					},
+					{
+						name: 'Έξοδα',
+						url: '/costs',
+						icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }],
+					},
+				],
+			},
+			devOptions: {
+				// lets you test install / offline behaviour with `npm run dev`
+				enabled: true,
+				type: 'module',
 			},
 			workbox: {
 				globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg}'],
+				cleanupOutdatedCaches: true,
+				clientsClaim: true,
+				// SPA: any unknown route falls back to the app shell
+				navigateFallback: '/index.html',
 				runtimeCaching: [
 					{
 						urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

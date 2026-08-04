@@ -6,15 +6,26 @@ import {
 	Trash2,
 	Edit2,
 	Send,
-	Search,
+	Phone,
+	SlidersHorizontal,
 	ChevronDown,
 	ChevronUp,
 	ChevronsUpDown,
-	X,
 	Check,
 } from 'lucide-react';
 import { supabase, InvitationFamily } from '../lib/supabase';
 import { toast } from 'sonner';
+import { cn } from '../lib/utils';
+import { FormModal } from '../components/ui/FormModal';
+import {
+	fieldClass,
+	Label,
+	Stepper,
+	PillGroup,
+	SearchInput,
+	Select,
+	Skeleton,
+} from '../components/ui/FormControls';
 
 const ADDED_BY_OPTIONS = [
 	{ value: 'tasos', label: 'Τάσος' },
@@ -51,14 +62,19 @@ const defaultForm = {
 	notes: '',
 };
 
+type StatusFilter = 'all' | 'sent' | 'pending';
+
 export function Admin() {
 	const [families, setFamilies] = useState<InvitationFamily[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [saving, setSaving] = useState(false);
 	const [showForm, setShowForm] = useState(false);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [filterBy, setFilterBy] = useState('all');
 	const [filterRelationship, setFilterRelationship] = useState('all');
+	const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
+	const [showFilters, setShowFilters] = useState(false);
 	const [formData, setFormData] = useState(defaultForm);
 	const [sortCol, setSortCol] = useState<
 		'family_name' | 'expected_guests' | 'relationship_type' | 'added_by' | null
@@ -68,13 +84,6 @@ export function Admin() {
 	useEffect(() => {
 		fetchFamilies();
 	}, []);
-
-	useEffect(() => {
-		document.body.style.overflow = showForm ? 'hidden' : '';
-		return () => {
-			document.body.style.overflow = '';
-		};
-	}, [showForm]);
 
 	const fetchFamilies = async () => {
 		setLoading(true);
@@ -98,12 +107,19 @@ export function Admin() {
 		setShowForm(false);
 	};
 
+	const openNewForm = () => {
+		setFormData(defaultForm);
+		setEditingId(null);
+		setShowForm(true);
+	};
+
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!formData.family_name.trim()) {
 			toast.error('Το όνομα είναι υποχρεωτικό');
 			return;
 		}
+		setSaving(true);
 		try {
 			if (editingId) {
 				const { error } = await supabase
@@ -123,6 +139,8 @@ export function Admin() {
 			resetForm();
 		} catch {
 			toast.error('Αποτυχία αποθήκευσης');
+		} finally {
+			setSaving(false);
 		}
 	};
 
@@ -139,8 +157,8 @@ export function Admin() {
 		setShowForm(true);
 	};
 
-	const handleDelete = async (id: string) => {
-		if (!confirm('Διαγραφή αυτής της εγγραφής;')) return;
+	const handleDelete = async (id: string, name: string) => {
+		if (!confirm(`Διαγραφή «${name}»;`)) return;
 		try {
 			const { error } = await supabase
 				.from('invitation_families')
@@ -155,6 +173,10 @@ export function Admin() {
 	};
 
 	const markInvitationSent = async (id: string, sent: boolean) => {
+		// optimistic — the toggle should feel instant on a phone
+		setFamilies((prev) =>
+			prev.map((f) => (f.id === id ? { ...f, invitation_sent: sent } : f))
+		);
 		try {
 			const { error } = await supabase
 				.from('invitation_families')
@@ -164,9 +186,9 @@ export function Admin() {
 				})
 				.eq('id', id);
 			if (error) throw error;
-			fetchFamilies();
 		} catch {
 			toast.error('Αποτυχία ενημέρωσης');
+			fetchFamilies();
 		}
 	};
 
@@ -190,7 +212,10 @@ export function Admin() {
 			const matchesRel =
 				filterRelationship === 'all' ||
 				f.relationship_type === filterRelationship;
-			return matchesAddedBy && matchesRel;
+			const matchesStatus =
+				filterStatus === 'all' ||
+				(filterStatus === 'sent' ? f.invitation_sent : !f.invitation_sent);
+			return matchesAddedBy && matchesRel && matchesStatus;
 		});
 
 		if (!sortCol) return filtered;
@@ -210,6 +235,7 @@ export function Admin() {
 		fuse,
 		filterBy,
 		filterRelationship,
+		filterStatus,
 		sortCol,
 		sortDir,
 	]);
@@ -245,31 +271,110 @@ export function Admin() {
 	const getAddedLabel = (v: string) =>
 		ADDED_BY_OPTIONS.find((o) => o.value === v)?.label ?? v;
 
-	const fieldClass =
-		'w-full px-3 py-2.5 rounded-xl border border-secondary bg-white text-base md:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all';
+	const dropdownCount =
+		(filterBy !== 'all' ? 1 : 0) + (filterRelationship !== 'all' ? 1 : 0);
+	const hasFilters =
+		dropdownCount > 0 || filterStatus !== 'all' || searchQuery.trim() !== '';
+
+	const clearFilters = () => {
+		setSearchQuery('');
+		setFilterBy('all');
+		setFilterRelationship('all');
+		setFilterStatus('all');
+	};
+
+	const statCards = [
+		{
+			label: 'Σύνολο',
+			value: stats.total,
+			color: 'text-text-primary',
+			status: 'all' as const,
+		},
+		{
+			label: 'Εστάλησαν',
+			value: stats.sent,
+			color: 'text-emerald-600',
+			status: 'sent' as const,
+		},
+		{
+			label: 'Εκκρεμούν',
+			value: stats.pending,
+			color: 'text-amber-600',
+			status: 'pending' as const,
+		},
+		{
+			label: 'Καλεσμένοι',
+			value: stats.guests,
+			color: 'text-accent',
+			status: null,
+		},
+	];
+
+	const actionBtn =
+		'w-10 h-10 flex items-center justify-center rounded-xl transition-colors active:scale-95 shrink-0';
+
+	const rowActions = (family: InvitationFamily) => (
+		<>
+			<button
+				onClick={() => markInvitationSent(family.id, !family.invitation_sent)}
+				className={cn(
+					actionBtn,
+					family.invitation_sent
+						? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+						: 'bg-secondary/40 text-text-muted hover:bg-secondary'
+				)}
+				title={
+					family.invitation_sent
+						? 'Σήμανση ως μη απεσταλμένο'
+						: 'Σήμανση ως απεσταλμένο'
+				}
+			>
+				<Send className="w-4 h-4" />
+			</button>
+			<button
+				onClick={() => handleEdit(family)}
+				className={cn(
+					actionBtn,
+					'bg-secondary/40 text-text-muted hover:bg-secondary'
+				)}
+				title="Επεξεργασία"
+			>
+				<Edit2 className="w-4 h-4" />
+			</button>
+			<button
+				onClick={() => handleDelete(family.id, family.family_name)}
+				className={cn(
+					actionBtn,
+					'bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-500'
+				)}
+				title="Διαγραφή"
+			>
+				<Trash2 className="w-4 h-4" />
+			</button>
+		</>
+	);
 
 	return (
 		<div className="min-h-screen bg-background">
-			{/* Top bar */}
-			<div className="bg-white border-b border-secondary/60 px-6 py-5">
-				<div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-					<div className="flex items-center gap-3">
-						<div className="w-10 h-10 rounded-2xl bg-accent/10 flex items-center justify-center">
+			{/* Top bar — sticky so "Προσθήκη" is always one tap away */}
+			<div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-secondary/60 px-4 sm:px-6 py-3 sm:py-4">
+				<div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
+					<div className="flex items-center gap-3 min-w-0">
+						<div className="w-10 h-10 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0">
 							<Users className="w-5 h-5 text-accent" />
 						</div>
-						<div>
-							<h1 className="text-xl font-semibold text-text-primary leading-tight">
+						<div className="min-w-0">
+							<h1 className="text-lg sm:text-xl font-semibold text-text-primary leading-tight">
 								Προσκλήσεις
 							</h1>
-							<p className="text-xs text-text-muted">{stats.total} εγγραφές</p>
+							<p className="text-xs text-text-muted">
+								{stats.total} εγγραφές · {stats.guests} άτομα
+							</p>
 						</div>
 					</div>
 					<button
-						onClick={() => {
-							resetForm();
-							setShowForm(true);
-						}}
-						className="flex items-center gap-2 px-4 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors"
+						onClick={openNewForm}
+						className="flex items-center gap-2 px-4 h-11 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 active:scale-95 transition shrink-0"
 					>
 						<Plus className="w-4 h-4" />
 						Προσθήκη
@@ -277,270 +382,167 @@ export function Admin() {
 				</div>
 			</div>
 
-			<div className="max-w-5xl mx-auto px-6 py-6 space-y-5">
-				{/* Stats */}
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-					{[
-						{ label: 'Σύνολο', value: stats.total, color: 'text-text-primary' },
-						{
-							label: 'Εστάλησαν',
-							value: stats.sent,
-							color: 'text-emerald-600',
-						},
-						{
-							label: 'Εκκρεμούν',
-							value: stats.pending,
-							color: 'text-amber-600',
-						},
-						{ label: 'Καλεσμένοι', value: stats.guests, color: 'text-accent' },
-					].map((s) => (
-						<div
-							key={s.label}
-							className="bg-white rounded-2xl border border-secondary/60 px-4 py-3"
-						>
-							<p className="text-xs text-text-muted font-medium">{s.label}</p>
-							<p className={`text-2xl font-bold mt-0.5 ${s.color}`}>
-								{s.value}
-							</p>
-						</div>
-					))}
+			<div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+				{/* Stats — also act as status filters */}
+				<div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+					{statCards.map((s) => {
+						const status = s.status;
+						const active = status !== null && filterStatus === status;
+						const className = cn(
+							'bg-white rounded-2xl border px-3.5 sm:px-4 py-2.5 sm:py-3 text-left transition-colors',
+							status !== null && 'hover:border-accent/50 active:scale-[0.98]',
+							active
+								? 'border-accent ring-2 ring-accent/20'
+								: 'border-secondary/60'
+						);
+						const body = (
+							<>
+								<p className="text-xs text-text-muted font-medium truncate">
+									{s.label}
+								</p>
+								<p
+									className={cn(
+										'text-xl sm:text-2xl font-bold mt-0.5 tabular-nums',
+										s.color
+									)}
+								>
+									{s.value}
+								</p>
+							</>
+						);
+
+						return status === null ? (
+							<div key={s.label} className={className}>
+								{body}
+							</div>
+						) : (
+							<button
+								key={s.label}
+								type="button"
+								onClick={() => setFilterStatus(status)}
+								aria-pressed={active}
+								className={className}
+							>
+								{body}
+							</button>
+						);
+					})}
 				</div>
 
-				{/* Form Modal */}
-				{showForm && (
-					<div
-						className="fixed inset-0 z-50 flex items-center justify-center p-4 !m-0"
-						onClick={resetForm}
-					>
-						<div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-						<div
-							className="relative w-full max-w-lg bg-white rounded-2xl shadow-elevated overflow-hidden max-h-[90vh] flex flex-col"
-							onClick={(e) => e.stopPropagation()}
+				{/* Search & filters */}
+				<div className="bg-white rounded-2xl border border-secondary/60 p-3 sm:p-4 space-y-2.5">
+					<div className="flex gap-2">
+						<SearchInput
+							value={searchQuery}
+							onChange={setSearchQuery}
+							placeholder="Αναζήτηση ονόματος, τηλεφώνου..."
+						/>
+						<button
+							type="button"
+							onClick={() => setShowFilters((v) => !v)}
+							className={cn(
+								'md:hidden relative flex items-center justify-center w-11 h-11 rounded-xl border transition-colors shrink-0',
+								showFilters || dropdownCount > 0
+									? 'border-accent text-accent bg-accent/5'
+									: 'border-secondary text-text-muted'
+							)}
+							aria-label="Φίλτρα"
 						>
-							<div className="flex items-center justify-between px-5 py-4 border-b border-secondary/60 shrink-0">
-								<h2 className="text-base font-semibold text-text-primary">
-									{editingId ? 'Επεξεργασία' : 'Νέα Εγγραφή'}
-								</h2>
-								<button
-									onClick={resetForm}
-									className="text-text-muted hover:text-text-primary transition-colors"
-								>
-									<X className="w-5 h-5" />
-								</button>
-							</div>
-							<form
-								onSubmit={handleSubmit}
-								className="p-5 space-y-4 overflow-y-auto"
+							<SlidersHorizontal className="w-4 h-4" />
+							{dropdownCount > 0 && (
+								<span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent text-white text-[10px] font-semibold flex items-center justify-center">
+									{dropdownCount}
+								</span>
+							)}
+						</button>
+					</div>
+
+					<div
+						className={cn(
+							'gap-2.5 md:grid md:grid-cols-2',
+							showFilters ? 'grid' : 'hidden'
+						)}
+					>
+						<Select value={filterBy} onChange={setFilterBy}>
+							<option value="all">Όλα τα άτομα</option>
+							{ADDED_BY_OPTIONS.map((o) => (
+								<option key={o.value} value={o.value}>
+									Από: {o.label}
+								</option>
+							))}
+						</Select>
+						<Select value={filterRelationship} onChange={setFilterRelationship}>
+							<option value="all">Όλες οι σχέσεις</option>
+							{RELATIONSHIP_OPTIONS.map((o) => (
+								<option key={o.value} value={o.value}>
+									{o.label}
+								</option>
+							))}
+						</Select>
+					</div>
+				</div>
+
+				{/* Result count */}
+				{!loading && (
+					<div className="flex items-center justify-between px-1 -mb-1">
+						<p className="text-xs text-text-muted">
+							{hasFilters ? (
+								<>
+									<span className="font-medium text-text-primary">
+										{filteredFamilies.length}
+									</span>{' '}
+									από {families.length} εγγραφές
+								</>
+							) : (
+								<>{families.length} εγγραφές</>
+							)}
+						</p>
+						{hasFilters && (
+							<button
+								onClick={clearFilters}
+								className="text-xs font-medium text-accent hover:underline"
 							>
-								<div className="grid md:grid-cols-2 gap-4">
-									<div className="md:col-span-2">
-										<label className="block text-xs font-medium text-text-muted mb-1.5">
-											Όνομα Οικογένειας / Ομάδας *
-										</label>
-										<input
-											type="text"
-											placeholder="π.χ. Οικογένεια Παπαδόπουλου"
-											value={formData.family_name}
-											onChange={(e) =>
-												setFormData({
-													...formData,
-													family_name: e.target.value,
-												})
-											}
-											className={fieldClass}
-											required
-										/>
-									</div>
-
-									<div>
-										<label className="block text-xs font-medium text-text-muted mb-1.5">
-											Αριθμός Ατόμων *
-										</label>
-										<div className="relative">
-											<select
-												value={formData.expected_guests}
-												onChange={(e) =>
-													setFormData({
-														...formData,
-														expected_guests: parseInt(e.target.value, 10),
-													})
-												}
-												className={`${fieldClass} appearance-none pr-8`}
-												required
-											>
-												{Array.from({ length: 10 }, (_, i) => i + 1).map(
-													(n) => (
-														<option key={n} value={n}>
-															{n}
-														</option>
-													)
-												)}
-											</select>
-											<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-										</div>
-									</div>
-
-									<div>
-										<label className="block text-xs font-medium text-text-muted mb-1.5">
-											Προστέθηκε Από *
-										</label>
-										<div className="relative">
-											<select
-												value={formData.added_by}
-												onChange={(e) =>
-													setFormData({ ...formData, added_by: e.target.value })
-												}
-												className={`${fieldClass} appearance-none pr-8`}
-											>
-												{ADDED_BY_OPTIONS.map((o) => (
-													<option key={o.value} value={o.value}>
-														{o.label}
-													</option>
-												))}
-											</select>
-											<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-										</div>
-									</div>
-
-									<div>
-										<label className="block text-xs font-medium text-text-muted mb-1.5">
-											Τύπος Σχέσης *
-										</label>
-										<div className="relative">
-											<select
-												value={formData.relationship_type}
-												onChange={(e) =>
-													setFormData({
-														...formData,
-														relationship_type: e.target.value,
-													})
-												}
-												className={`${fieldClass} appearance-none pr-8`}
-											>
-												{RELATIONSHIP_OPTIONS.map((o) => (
-													<option key={o.value} value={o.value}>
-														{o.label}
-													</option>
-												))}
-											</select>
-											<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-										</div>
-									</div>
-
-									<div>
-										<label className="block text-xs font-medium text-text-muted mb-1.5">
-											Τηλέφωνο
-										</label>
-										<input
-											type="tel"
-											placeholder="Προαιρετικό"
-											value={formData.contact_phone}
-											onChange={(e) =>
-												setFormData({
-													...formData,
-													contact_phone: e.target.value,
-												})
-											}
-											className={fieldClass}
-										/>
-									</div>
-
-									<div className="md:col-span-2">
-										<label className="block text-xs font-medium text-text-muted mb-1.5">
-											Σημειώσεις
-										</label>
-										<textarea
-											placeholder="Πρόσθετες πληροφορίες..."
-											value={formData.notes}
-											onChange={(e) =>
-												setFormData({ ...formData, notes: e.target.value })
-											}
-											rows={2}
-											className={fieldClass}
-										/>
-									</div>
-								</div>
-
-								<div className="flex gap-2 pt-1">
-									<button
-										type="button"
-										onClick={resetForm}
-										className="px-4 py-2.5 text-sm font-medium text-text-muted border border-secondary rounded-xl hover:bg-secondary/30 transition-colors"
-									>
-										Ακύρωση
-									</button>
-									<button
-										type="submit"
-										className="flex-1 px-4 py-2.5 text-sm font-medium bg-accent text-white rounded-xl hover:bg-accent/90 transition-colors"
-									>
-										{editingId ? 'Αποθήκευση' : 'Προσθήκη'}
-									</button>
-								</div>
-							</form>
-						</div>
+								Καθαρισμός φίλτρων
+							</button>
+						)}
 					</div>
 				)}
 
-				{/* Search & Filters */}
-				<div className="bg-white rounded-2xl border border-secondary/60 p-4">
-					<div className="grid md:grid-cols-3 gap-3">
-						<div className="relative">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-							<input
-								type="text"
-								placeholder="Αναζήτηση..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className={`${fieldClass} pl-9`}
-							/>
-						</div>
-						<div className="relative">
-							<select
-								value={filterBy}
-								onChange={(e) => setFilterBy(e.target.value)}
-								className={`${fieldClass} appearance-none pr-8`}
-							>
-								<option value="all">Όλα τα άτομα</option>
-								{ADDED_BY_OPTIONS.map((o) => (
-									<option key={o.value} value={o.value}>
-										Από: {o.label}
-									</option>
-								))}
-							</select>
-							<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-						</div>
-						<div className="relative">
-							<select
-								value={filterRelationship}
-								onChange={(e) => setFilterRelationship(e.target.value)}
-								className={`${fieldClass} appearance-none pr-8`}
-							>
-								<option value="all">Όλες οι σχέσεις</option>
-								{RELATIONSHIP_OPTIONS.map((o) => (
-									<option key={o.value} value={o.value}>
-										{o.label}
-									</option>
-								))}
-							</select>
-							<ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-						</div>
-					</div>
-				</div>
-
 				{/* List */}
 				{loading ? (
-					<div className="flex items-center justify-center py-16 text-text-muted text-sm">
-						Φόρτωση...
-					</div>
+					<Skeleton />
 				) : filteredFamilies.length === 0 ? (
-					<div className="flex flex-col items-center justify-center py-16 text-text-muted">
-						<Users className="w-12 h-12 text-secondary mb-3" />
-						<p className="text-sm">Δεν βρέθηκαν εγγραφές</p>
+					<div className="flex flex-col items-center justify-center py-14 px-6 text-center bg-white rounded-2xl border border-secondary/60">
+						<Users className="w-11 h-11 text-secondary mb-3" />
+						<p className="text-sm font-medium text-text-primary">
+							{hasFilters ? 'Δεν βρέθηκαν εγγραφές' : 'Καμία πρόσκληση ακόμη'}
+						</p>
+						<p className="text-xs text-text-muted mt-1 mb-4">
+							{hasFilters
+								? 'Δοκιμάστε διαφορετικά φίλτρα'
+								: 'Προσθέστε την πρώτη σας εγγραφή'}
+						</p>
+						{hasFilters ? (
+							<button
+								onClick={clearFilters}
+								className="px-4 h-10 rounded-xl border border-secondary text-sm font-medium text-text-muted hover:bg-secondary/30 transition-colors"
+							>
+								Καθαρισμός φίλτρων
+							</button>
+						) : (
+							<button
+								onClick={openNewForm}
+								className="flex items-center gap-2 px-4 h-10 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors"
+							>
+								<Plus className="w-4 h-4" />
+								Προσθήκη
+							</button>
+						)}
 					</div>
 				) : (
 					<div className="bg-white rounded-2xl border border-secondary/60 overflow-hidden">
 						{/* Table header — desktop */}
-						<div className="hidden md:grid grid-cols-[1fr_60px_140px_100px_116px] px-5 py-3 border-b border-secondary/60 text-xs font-medium text-text-muted uppercase tracking-wide">
+						<div className="hidden md:grid grid-cols-[1fr_60px_140px_100px_140px] px-5 py-3 border-b border-secondary/60 text-xs font-medium text-text-muted uppercase tracking-wide">
 							{(
 								[
 									{ col: 'family_name', label: 'Όνομα', align: 'left' },
@@ -552,7 +554,11 @@ export function Admin() {
 								<button
 									key={col}
 									onClick={() => handleSort(col)}
-									className={`flex items-center gap-1 hover:text-text-primary transition-colors ${align === 'center' ? 'justify-center' : ''} ${sortCol === col ? 'text-accent' : ''}`}
+									className={cn(
+										'flex items-center gap-1 hover:text-text-primary transition-colors',
+										align === 'center' && 'justify-center',
+										sortCol === col && 'text-accent'
+									)}
 								>
 									{label}
 									<SortIcon col={col} />
@@ -565,62 +571,54 @@ export function Admin() {
 							{filteredFamilies.map((family) => (
 								<div
 									key={family.id}
-									className="px-5 py-4 hover:bg-secondary/10 transition-colors"
+									className="px-4 sm:px-5 py-3.5 hover:bg-secondary/10 transition-colors"
 								>
-									{/* Mobile layout */}
-									<div className="flex items-start justify-between gap-3 md:hidden">
-										<div className="flex-1 min-w-0">
-											<div className="flex items-center gap-2 flex-wrap">
-												<span className="font-medium text-text-primary truncate">
-													{family.family_name}
-												</span>
-												{family.invitation_sent && (
-													<span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 text-xs rounded-full font-medium">
-														<Check className="w-3 h-3" /> Εστάλη
-													</span>
-												)}
-											</div>
-											<div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-muted">
-												<span>{family.expected_guests} άτομα</span>
-												<span>{getRelLabel(family.relationship_type)}</span>
-												<span>{getAddedLabel(family.added_by)}</span>
-												{family.contact_phone && (
-													<span>{family.contact_phone}</span>
-												)}
-											</div>
-											{family.notes && (
-												<p className="mt-1 text-xs text-text-muted italic truncate">
-													{family.notes}
-												</p>
-											)}
-										</div>
-										<div className="flex items-center gap-1 shrink-0">
-											<button
-												onClick={() =>
-													markInvitationSent(family.id, !family.invitation_sent)
-												}
-												className={`p-2 rounded-xl transition-colors ${family.invitation_sent ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-secondary/40 text-text-muted hover:bg-secondary'}`}
-												title={family.invitation_sent ? 'Αναίρεση' : 'Εστάλη'}
-											>
-												<Send className="w-4 h-4" />
-											</button>
+									{/* Mobile */}
+									<div className="md:hidden">
+										<div className="flex items-start justify-between gap-3">
 											<button
 												onClick={() => handleEdit(family)}
-												className="p-2 rounded-xl bg-secondary/40 text-text-muted hover:bg-secondary transition-colors"
+												className="flex-1 min-w-0 text-left"
 											>
-												<Edit2 className="w-4 h-4" />
+												<div className="flex items-center gap-2">
+													<span className="font-medium text-text-primary truncate">
+														{family.family_name}
+													</span>
+													{family.invitation_sent && (
+														<Check className="w-4 h-4 text-emerald-600 shrink-0" />
+													)}
+												</div>
+												<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+													<span className="px-1.5 py-0.5 rounded-md bg-accent/10 text-accent font-medium">
+														{family.expected_guests} άτομα
+													</span>
+													<span>{getRelLabel(family.relationship_type)}</span>
+													<span className="text-text-muted/60">·</span>
+													<span>{getAddedLabel(family.added_by)}</span>
+												</div>
+												{family.notes && (
+													<p className="mt-1 text-xs text-text-muted italic line-clamp-1">
+														{family.notes}
+													</p>
+												)}
 											</button>
-											<button
-												onClick={() => handleDelete(family.id)}
-												className="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 transition-colors"
-											>
-												<Trash2 className="w-4 h-4" />
-											</button>
+											<div className="flex items-center gap-1 shrink-0">
+												{rowActions(family)}
+											</div>
 										</div>
+										{family.contact_phone && (
+											<a
+												href={`tel:${family.contact_phone}`}
+												className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-accent"
+											>
+												<Phone className="w-3.5 h-3.5" />
+												{family.contact_phone}
+											</a>
+										)}
 									</div>
 
-									{/* Desktop layout */}
-									<div className="hidden md:grid grid-cols-[1fr_60px_140px_100px_116px] items-center">
+									{/* Desktop */}
+									<div className="hidden md:grid grid-cols-[1fr_60px_140px_100px_140px] items-center">
 										<div className="min-w-0 pr-4">
 											<div className="flex items-center gap-2">
 												<span className="font-medium text-text-primary text-sm truncate">
@@ -632,43 +630,33 @@ export function Admin() {
 													</span>
 												)}
 											</div>
-											{family.notes && (
-												<p className="text-xs text-text-muted italic mt-0.5 truncate">
-													{family.notes}
-												</p>
-											)}
+											<div className="flex items-center gap-2 mt-0.5">
+												{family.contact_phone && (
+													<a
+														href={`tel:${family.contact_phone}`}
+														className="text-xs text-text-muted hover:text-accent transition-colors"
+													>
+														{family.contact_phone}
+													</a>
+												)}
+												{family.notes && (
+													<p className="text-xs text-text-muted italic truncate">
+														{family.notes}
+													</p>
+												)}
+											</div>
 										</div>
-										<span className="text-sm text-text-muted text-center">
+										<span className="text-sm text-text-primary font-medium text-center tabular-nums">
 											{family.expected_guests}
 										</span>
-										<span className="text-sm text-text-muted truncate">
+										<span className="text-sm text-text-muted truncate pr-2">
 											{getRelLabel(family.relationship_type)}
 										</span>
-										<span className="text-sm text-text-muted truncate">
+										<span className="text-sm text-text-muted truncate pr-2">
 											{getAddedLabel(family.added_by)}
 										</span>
-										<div className="flex items-center gap-1">
-											<button
-												onClick={() =>
-													markInvitationSent(family.id, !family.invitation_sent)
-												}
-												className={`p-2 rounded-xl transition-colors ${family.invitation_sent ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-secondary/40 text-text-muted hover:bg-secondary'}`}
-												title={family.invitation_sent ? 'Αναίρεση' : 'Εστάλη'}
-											>
-												<Send className="w-4 h-4" />
-											</button>
-											<button
-												onClick={() => handleEdit(family)}
-												className="p-2 rounded-xl bg-secondary/40 text-text-muted hover:bg-secondary transition-colors"
-											>
-												<Edit2 className="w-4 h-4" />
-											</button>
-											<button
-												onClick={() => handleDelete(family.id)}
-												className="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 transition-colors"
-											>
-												<Trash2 className="w-4 h-4" />
-											</button>
+										<div className="flex items-center justify-center gap-1">
+											{rowActions(family)}
 										</div>
 									</div>
 								</div>
@@ -677,6 +665,106 @@ export function Admin() {
 					</div>
 				)}
 			</div>
+
+			<FormModal
+				open={showForm}
+				title={editingId ? 'Επεξεργασία' : 'Νέα Εγγραφή'}
+				onClose={resetForm}
+				onSubmit={handleSubmit}
+				footer={
+					<div className="flex gap-2">
+						<button
+							type="button"
+							onClick={resetForm}
+							className="px-4 h-11 text-sm font-medium text-text-muted border border-secondary rounded-xl hover:bg-secondary/30 transition-colors"
+						>
+							Ακύρωση
+						</button>
+						<button
+							type="submit"
+							disabled={saving || !formData.family_name.trim()}
+							className="flex-1 h-11 text-sm font-medium bg-accent text-white rounded-xl hover:bg-accent/90 active:scale-[0.98] transition disabled:opacity-40 disabled:pointer-events-none"
+						>
+							{saving ? 'Αποθήκευση...' : editingId ? 'Αποθήκευση' : 'Προσθήκη'}
+						</button>
+					</div>
+				}
+			>
+				<div className="space-y-4">
+					<div>
+						<Label>Όνομα Οικογένειας / Ομάδας *</Label>
+						<input
+							type="text"
+							autoFocus
+							placeholder="π.χ. Οικογένεια Παπαδόπουλου"
+							value={formData.family_name}
+							onChange={(e) =>
+								setFormData({ ...formData, family_name: e.target.value })
+							}
+							className={fieldClass}
+							required
+						/>
+					</div>
+
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<Label>Αριθμός Ατόμων *</Label>
+							<Stepper
+								value={formData.expected_guests}
+								onChange={(v) =>
+									setFormData({ ...formData, expected_guests: v })
+								}
+							/>
+						</div>
+						<div>
+							<Label>Τηλέφωνο</Label>
+							<input
+								type="tel"
+								inputMode="tel"
+								placeholder="Προαιρετικό"
+								value={formData.contact_phone}
+								onChange={(e) =>
+									setFormData({ ...formData, contact_phone: e.target.value })
+								}
+								className={fieldClass}
+							/>
+						</div>
+					</div>
+
+					<div>
+						<Label>Τύπος Σχέσης *</Label>
+						<PillGroup
+							options={RELATIONSHIP_OPTIONS}
+							value={formData.relationship_type}
+							onChange={(v) =>
+								setFormData({ ...formData, relationship_type: v })
+							}
+						/>
+					</div>
+
+					<div>
+						<Label>Προστέθηκε Από *</Label>
+						<PillGroup
+							options={ADDED_BY_OPTIONS}
+							value={formData.added_by}
+							onChange={(v) => setFormData({ ...formData, added_by: v })}
+						/>
+					</div>
+
+					<div>
+						<Label hint="προαιρετικό">Σημειώσεις</Label>
+						<textarea
+							placeholder="Πρόσθετες πληροφορίες..."
+							value={formData.notes}
+							onChange={(e) =>
+								setFormData({ ...formData, notes: e.target.value })
+							}
+							rows={2}
+							className={fieldClass}
+						/>
+					</div>
+				</div>
+			</FormModal>
 		</div>
 	);
 }

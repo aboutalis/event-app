@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 
 const NAV = [
 	{ path: '/admin', label: 'Προσκλήσεις' },
+	{ path: '/costs', label: 'Έξοδα' },
 ];
 
 interface LayoutProps {
@@ -36,9 +37,7 @@ export function Layout({ children }: LayoutProps) {
 					})}
 				</div>
 			</nav>
-			<main className="flex-1 flex flex-col">
-				{children}
-			</main>
+			<main className="flex-1 flex flex-col">{children}</main>
 		</div>
 	);
 }
